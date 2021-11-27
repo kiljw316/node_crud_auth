@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 
 const connect = () => {
-    mongoose.connect(`mongodb://test:test@13.209.4.79:27017/admin`, (error) => {
+    mongoose.connect(`mongodb://항해아이디비번@13.209.4.79:27017/admin`, (error) => {
         if (error) console.log('Mongo DB Connect Error');
         else console.log('Mongo Db Connect Success');
     });

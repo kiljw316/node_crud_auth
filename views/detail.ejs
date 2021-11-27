@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
+    <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon" />
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+        integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous" />
+
+    <!-- Font Awesome CSS -->
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.js"
+        integrity="sha256-QWo7LDvxbWT2tbbQ97B53yJnYU3WhH/C8ycbRAkjPDc=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+        integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.min.js"
+        integrity="sha384-w1Q4orYjBQndcko6MimVbzY0tgp4pWB4lZ7lr30WKz0vr/aWKhXdBNmNb5D92v7s"
+        crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
+
+    <link href="/static/mystyle.css" rel="stylesheet" />
+    <script>
+        let user = {};
+        user.userId = null;
+        $(document).ready(function () {
+            if (localStorage.getItem('token')) {
+                getSelf(function (u) {
+                    user = u;
+                });
+            }
+            get_posts();
+            get_comments();
+            $('#btnSave').hide();
+        })
+
+        function getSelf(callback) {
+            $.ajax({
+                type: 'GET',
+                url: '/api/sign/me',
+                headers: {
+                    authorization: `Bearer ${localStorage.getItem('token')}`,
+                },
+                success: function (response) {
+
+                    callback(response.user);
+                },
+                error: function (xhr, status, error) {
+                    if (status == 401) {
+                        alert('로그인이 필요합니다.');
+                    } else {
+                        localStorage.clear();
+                        alert('알 수 없는 문제가 발생했습니다. 관리자에게 문의하세요.');
+                    }
+                    window.location.href = '/';
+                },
+            });
+        }
+
+        function get_posts() {
+            $.ajax({
+                type: "GET",
+                url: `/api/posts/<%= postId %>`,
+                data: {},
+                success: function (response) {
+                    let posts = response["posts"];
+                    $('#title').val(posts.title).attr('disabled', 'disabled');
+                    $('#content').val(posts.content).attr('disabled', 'disabled');
+                    if (posts['userId'] == user['userId']) {
+                        $('#modify').show();
+                    } else {
+                        $('#modify').hide();
+                    };
+                }
+            })
+        }
+
+        function get_comments() {
+            $('#table-body').empty();
+            $.ajax({
+                type: "GET",
+                url: `/api/posts/<%= postId %>/comments`,
+                data: {},
+                success: function (response) {
+                    let comments = response["comments"];
+                    let temp_html = ``;
+                    for (let i = 0; i < comments.length; i++) {
+                        if (user['userId'] == comments[i]['userId']) {
+                            temp_html = `<tr id=${comments[i]['commentId']}>
+                                            <th style="width: 16.66%" scope="row">${comments[i]['nickname']}</th>
+                                            <td id="td${comments[i]['commentId']}" class="${comments[i]['commentId']}" scope="col">${comments[i]['comment']}</td>
+                                            <td class="${comments[i]['commentId']}">
+                                                <i class="fa fa-pencil" aria-hidden="true" onclick="modify_comment(${comments[i]['commentId']})"></i>
+                                                <i class="fa fa-times" aria-hidden="true" onclick="delete_comment(${comments[i]['commentId']})"></i>
+                                            </td>
+                                        
+                                            <td>
+                                                <div class="modify${comments[i]['commentId']}" style="display: none;">
+                                                <div class="input-group mb-3">
+                                                    <input id='input${comments[i]['commentId']}' type="text" class="form-control" placeholder="" aria-label="Recipient's username" aria-describedby="button-addon2">
+                                                    <button onclick="comment_save(${comments[i]['commentId']})" class="btn btn-outline-secondary" type="button" id="button-addon2">저장</button>
+                                                </div>
+                                            </div>
+                                            </td>
+                                            
+                                        </tr>`;
+                        } else {
+                            temp_html = `<tr id=${comments[i]['commentId']}>
+                                            <th style="width: 16.66%" scope="row">${comments[i]['nickname']}</th>
+                                            <td scope="col">${comments[i]['comment']}</td>
+                                        </tr>`;
+                        }
+                        $('#table-body').append(temp_html);
+                    }
+                }
+            })
+        }
+
+        function comment_save(commentId) {
+            let comment = $(`#input${commentId}`).val();
+            if (comment == '') {
+                alert("댓글을 작성해주세요");
+                return;
+            }
+            $.ajax({
+                type: "PATCH",
+                url: `/api/posts/<%= postId %>/comments/${commentId}`,
+                data: {
+                    comment: comment
+                },
+                success: function (response) {
+                    if (response['result'] == 'success') {
+                        $(`.${commentId}`).css('display', 'block');
+                        $('.modify').css('display', 'none');
+                        location.href = location.href;
+                        history.go(0);
+                    }
+                }
+            })
+        }
+
+
+        function modify() {
+            $('#btnSave').show();
+            $('#modify').hide();
+            $('#title').attr('disabled', false);
+            $('#content').attr('disabled', false);
+        };
+
+        function btnSave() {
+            let title = $('#title').val();
+            let content = $('#content').val();
+            if (title == '' || content == '') {
+                alert('빈칸이 있습니다.');
+                return;
+            }
+            $.ajax({
+                type: "PUT",
+                url: `/api/posts/<%= postId %>`,
+                data: {
+                    title: title,
+                    content: content
+                },
+                success: function (response) {
+                    if (response['result'] == 'success') {
+                        alert('저장되었습니다.');
+                        window.location.replace('/');
+                    };
+                }
+            })
+        }
+
+        function write_Comment() {
+            let comment = $('#comment').val();
+            if (user['userId'] == null) {
+                alert('로그인 후 작성할 수 있습니다.');
+                window.location.href='/login';
+            } else if (comment == '') {
+                alert('댓글 내용을 입력해주세요!');
+                return;
+            };
+            $.ajax({
+                type: "POST",
+                url: `/api/posts/<%= postId %>/comments`,
+                data: {
+                    comment: comment,
+                    userId: user['userId'],
+                    nickname: user['nickname']
+
+                },
+                success: function (response) {
+                    if (response['result'] == 'success') {
+                        window.location.reload();
+                    };
+                }
+            })
+        }
+
+        function write_comment2() {
+            if (user['userId'] == null) {
+                alert('로그인 후 작성할 수 있습니다.');
+                window.location.href='/login';
+            }
+            return;
+        }
+
+        function delete_comment(commentId) {
+            if (confirm('정말로 삭제하시겠습니까?')) {
+                $.ajax({
+                    type: "DELETE",
+                    url: `/api/posts/<%= postId %>/comments/${commentId}`,
+                    data: {},
+                    success: function (response) {
+                        if (response['result'] == 'success') {
+                            window.location.reload();
+                        };
+                    }
+                })
+
+            }
+        }
+
+        function modify_comment(commentId) {
+            let comment = $(`#td${commentId}`).text();
+            $(`.${commentId}`).css('display', 'none');
+            $(`.modify${commentId}`).css('display', 'block');
+            $(`#input${commentId}`).val(comment);
+        }
+    </script>
+    <title>수정 페이지</title>
+
+    <style>
+        .btn {
+            float: right;
+            margin: 5px;
+        }
+
+        .container {
+            width: 900px;
+            margin: auto;
+        }
+
+        td {
+            float: left;
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <nav class="navbar navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">home</a>
+        </div>
+    </nav>
+    <article>
+        <div class="container" role="main">
+            <h2></h2>
+            <div class="mb-3">
+                <label for="title">제목</label>
+                <input type="text" class="form-control" name="title" id="title" maxlength="20"
+                    placeholder="제목을 입력해 주세요">
+            </div>
+
+            <div class="mb-3">
+                <label for="description">내용</label>
+                <textarea class="form-control" rows="5" name="description" id="content"
+                    placeholder="내용을 입력해 주세요"></textarea>
+            </div>
+
+            <div>
+                <button onclick="modify()" type="button" class="btn btn-outline-primary" id="modify">수정하기</button>
+                <button onclick="btnSave()" type="button" class="btn btn-outline-primary" id="btnSave">수정완료</button>
+            </div>
+        </div>
+    </article>
+
+    <table class="table">
+        <tbody id="table-body">
+        </tbody>
+    </table>
+    <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon1">comment</span>
+        <input onclick="write_comment2()" id="comment" type="text" class="form-control" placeholder="" aria-label="Username"
+            aria-describedby="basic-addon1">
+        <button onclick="write_Comment()" type="button" class="btn btn-primary">작성</button>
+    </div>
+    
+</body>
+</html>
